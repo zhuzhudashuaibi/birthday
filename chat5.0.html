@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=yes">
+  <meta name="theme-color" content="#121212">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="light">
+  <title>present</title>
+  <style>
+    :root {
+      --envelope-width: clamp(260px, 68vw, 330px);
+      --envelope-height: clamp(185px, 48vw, 230px);
+      --flap-height: clamp(105px, 27vw, 135px);
+      --card-width: clamp(280px, 76vw, 370px);
+      --card-height: clamp(350px, 70vw, 460px);
+      --seal-size: clamp(40px, 10vw, 50px);
+      --grid-color: rgba(255, 255, 255, 0.04);
+      --accent: #f4737b;
+      --accent-glow: #f9a0a6;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'SF Pro Display', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+      background-color: #121212;
+      background-image:
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+      background-size: 22px 22px;
+      background-position: -1px -1px;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 16px;
+      touch-action: pan-x pan-y;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none;
+      user-select: none;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* 背景微光 */
+    .bg-glow {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+      filter: blur(80px);
+      opacity: 0.12;
+    }
+    .bg-glow--1 {
+      width: 220px;
+      height: 220px;
+      background: #f4737b;
+      top: -8%;
+      left: -15%;
+      animation: glowDrift 10s ease-in-out infinite;
+    }
+    .bg-glow--2 {
+      width: 180px;
+      height: 180px;
+      background: #f9a0a6;
+      bottom: -10%;
+      right: -12%;
+      animation: glowDrift 12s ease-in-out infinite reverse;
+    }
+    @keyframes glowDrift {
+      0%,
+      100% {
+        transform: translate(0, 0);
+      }
+      33% {
+        transform: translate(30px, -20px);
+      }
+      66% {
+        transform: translate(-15px, 15px);
+      }
+    }
+
+    /* 微粒子 */
+    .particle-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .particle {
+      position: absolute;
+      width: 2px;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: 50%;
+      animation: particleFloat 14s linear infinite;
+      opacity: 0;
+    }
+    @keyframes particleFloat {
+      0% {
+        transform: translateY(0) translateX(0);
+        opacity: 0;
+      }
+      5% {
+        opacity: 0.7;
+      }
+      85% {
+        opacity: 0.3;
+      }
+      100% {
+        transform: translateY(-105vh) translateX(40px);
+        opacity: 0;
+      }
+    }
+
+    .scene {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      perspective: 900px;
+      width: 100%;
+      max-width: 500px;
+    }
+
+    /* 提示文字 */
+    .hint {
+      margin-bottom: 22px;
+      font-size: 0.82rem;
+      color: rgba(255, 255, 255, 0.65);
+      letter-spacing: 0.06em;
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      padding: 7px 24px;
+      border-radius: 40px;
+      white-space: nowrap;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      pointer-events: none;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .hint.hidden {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+
+    /* 信封容器 */
+    .envelope-wrapper {
+      position: relative;
+      width: var(--envelope-width);
+      height: var(--envelope-height);
+      cursor: pointer;
+      animation: envelopeFloat 4.5s ease-in-out infinite;
+      transition: filter 0.25s, transform 0.2s;
+    }
+    .envelope-wrapper:active {
+      filter: brightness(1.08);
+      transform: scale(0.97);
+    }
+    .envelope-wrapper.opened {
+      animation: none;
+    }
+    .envelope-wrapper.opened:active {
+      transform: scale(0.98);
+    }
+
+    @keyframes envelopeFloat {
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+      35% {
+        transform: translateY(-7px);
+      }
+      65% {
+        transform: translateY(-3px);
+      }
+      85% {
+        transform: translateY(-6px);
+      }
+    }
+
+    /* 信封主体 - 磨砂玻璃 */
+    .envelope-body {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: calc(var(--envelope-height) - 5px);
+      background: rgba(255, 255, 255, 0.09);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-radius: 12px 12px 8px 8px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      z-index: 3;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+    }
+    /* 信封底部的微妙光泽 */
+    .envelope-body::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+      pointer-events: none;
+    }
+
+    /* V形缺口 */
+    .notch {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 28px;
+      z-index: 5;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s ease 0.18s;
+    }
+    .envelope-wrapper.opened .notch {
+      opacity: 1;
+    }
+    .notch::before,
+    .notch::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      width: 50.5%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.07);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    .notch::before {
+      left: 0;
+      clip-path: polygon(0 0, 100% 100%, 0 100%);
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .notch::after {
+      right: 0;
+      clip-path: polygon(100% 0, 0 100%, 100% 100%);
+      border-left: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    /* 封盖容器 - 3D翻转 */
+    .flap-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: var(--flap-height);
+      z-index: 6;
+      transform-origin: top center;
+      transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      will-change: transform;
+    }
+    .envelope-wrapper.opened .flap-container {
+      transform: rotateX(-178deg);
+      transition: transform 0.65s cubic-bezier(0.22, 0.1, 0.12, 1);
+    }
+    .flap,
+    .flap-inner {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+    }
+    .flap {
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      clip-path: polygon(0 0, 50% 100%, 100% 0);
+      border-radius: 6px 6px 0 0;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      border-top: 1px solid rgba(255, 255, 255, 0.14);
+    }
+    .flap-inner {
+      background: rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      clip-path: polygon(0 0, 50% 100%, 100% 0);
+      transform: rotateX(180deg);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    /* 火漆印章 - 简约发光圆点 */
+    .seal {
+      position: absolute;
+      bottom: 8px;
+      left: 50%;
+      transform: translateX(-50%) translateY(45%);
+      width: var(--seal-size);
+      height: var(--seal-size);
+      background: radial-gradient(circle at 38% 32%, #f9a0a6 0%, #f4737b 40%, #e04a55 80%, #b8303b 100%);
+      border-radius: 50%;
+      z-index: 8;
+      box-shadow: 0 0 20px rgba(244, 115, 123, 0.45),
+        0 0 50px rgba(244, 115, 123, 0.2),
+        0 3px 10px rgba(0, 0, 0, 0.4),
+        inset 0 -1px 2px rgba(0, 0, 0, 0.2),
+        inset 0 1px 2px rgba(255, 200, 200, 0.35);
+      cursor: pointer;
+      transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+        box-shadow 0.35s ease;
+      animation: sealGlow 2.8s ease-in-out infinite;
+    }
+    .seal::after {
+      content: '';
+      position: absolute;
+      top: 16%;
+      left: 24%;
+      width: 26%;
+      height: 16%;
+      background: rgba(255, 255, 255, 0.55);
+      border-radius: 50%;
+      transform: rotate(-18deg);
+      pointer-events: none;
+    }
+    @keyframes sealGlow {
+      0%,
+      100% {
+        box-shadow: 0 0 20px rgba(244, 115, 123, 0.45), 0 0 50px rgba(244, 115, 123, 0.2), 0 3px 10px rgba(0, 0, 0, 0.4), 0 0 0 0 rgba(244, 115, 123, 0.4);
+      }
+      50% {
+        box-shadow: 0 0 28px rgba(244, 115, 123, 0.6), 0 0 65px rgba(244, 115, 123, 0.3), 0 3px 10px rgba(0, 0, 0, 0.4), 0 0 0 14px rgba(244, 115, 123, 0);
+      }
+    }
+    .envelope-wrapper.opened .seal {
+      animation: none;
+      transform: translateX(-50%) translateY(45%) scale(0.82);
+      box-shadow: 0 0 10px rgba(244, 115, 123, 0.3), 0 2px 6px rgba(0, 0, 0, 0.35);
+    }
+
+    /* 贺卡 - iOS26白色液态玻璃 */
+    .card {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      width: var(--card-width);
+      height: var(--card-height);
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      border-radius: 52px;
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5),
+        0 0 0 1px rgba(255, 255, 255, 0.3) inset,
+        0 1px 0 rgba(255, 255, 255, 0.45) inset,
+        0 0 80px rgba(255, 255, 255, 0.06);
+      padding: 30px 22px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      z-index: 20;
+      border: 1px solid rgb(255, 255, 255);
+      outline: none;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      pointer-events: none;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.55);
+      transition: transform 0.6s cubic-bezier(0.22, 0.61, 0.36, 1), opacity 0.35s ease;
+      will-change: transform, opacity;
+    }
+    .card.visible {
+      pointer-events: auto;
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    .card::-webkit-scrollbar {
+      width: 4px;
+    }
+    .card::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 10px;
+    }
+    .card::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    /* 贺卡顶部光泽条 */
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 55px;
+      height: 3px;
+      background: rgba(0, 0, 0, 0.12);
+      border-radius: 3px;
+      pointer-events: none;
+    }
+
+    .card-title {
+      font-size: clamp(1.5rem, 4.5vw, 1.9rem);
+      font-weight: 700;
+      color: #3a2a28;
+      margin-bottom: 4px;
+      letter-spacing: 0.05em;
+    }
+    .card-divider {
+      width: 50px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #d4a8a0, #e0b8b0, #d4a8a0, transparent);
+      margin: 8px 0 16px;
+      border-radius: 1px;
+    }
+    .typewriter-text {
+      font-size: clamp(0.92rem, 3vw, 1.12rem);
+      color: #4a3a36;
+      line-height: 1.9;
+      letter-spacing: 0.04em;
+      text-align: center;
+      white-space: pre-wrap;
+      min-height: 140px;
+      width: 100%;
+      padding: 0 4px;
+      font-weight: 440;
+      font-family: "SimSun", serif;
+    }
+    .typewriter-text .highlight {
+      color: #c94a3f;
+      font-weight: 650;
+    }
+    .card-footer {
+      margin-top: 14px;
+      font-size: clamp(1.3rem, 4.5vw, 2rem);
+      letter-spacing: 0.22em;
+    }
+
+    /* 纸屑 - 简约几何 */
+    .confetti-burst {
+      position: fixed;
+      pointer-events: none;
+      z-index: 50;
+    }
+    .confetti-piece {
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+      animation: confettiExplode 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+      opacity: 0;
+    }
+    @keyframes confettiExplode {
+      0% {
+        transform: translate(0, 0) rotate(0deg) scale(0);
+        opacity: 0;
+      }
+      12% {
+        opacity: 1;
+        transform: translate(var(--x15), var(--y15)) rotate(var(--r15)) scale(1.35);
+      }
+      55% {
+        opacity: 0.75;
+        transform: translate(var(--x60), var(--y60)) rotate(var(--r60)) scale(0.85);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(var(--x100), var(--y100)) rotate(var(--r100)) scale(0.15);
+      }
+    }
+
+    /* 响应式 */
+    @media (max-width: 360px) {
+      .card {
+        padding: 22px 14px 18px;
+        border-radius: 20px;
+      }
+      .card-title {
+        font-size: 1.3rem;
+      }
+    }
+    @media (min-width: 430px) {
+      .card {
+        border-radius: 24px;
+        padding: 20px 26px 28px;
+      }
+    }
+
+    /* 降级：不支持backdrop-filter的设备 */
+    @supports not (backdrop-filter: blur(1px)) {
+      .envelope-body {
+        background: rgba(40, 40, 40, 0.75);
+      }
+      .flap {
+        background: rgba(50, 50, 50, 0.8);
+      }
+      .flap-inner {
+        background: rgba(35, 35, 35, 0.7);
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.92);
+      }
+      .notch::before,
+      .notch::after {
+        background: rgba(45, 45, 45, 0.7);
+      }
+    }
+
+    /* 减少动画偏好 */
+    @media (prefers-reduced-motion: reduce) {
+      .envelope-wrapper {
+        animation: none;
+      }
+      .seal {
+        animation: none;
+      }
+      .bg-glow {
+        animation: none;
+      }
+      .particle {
+        animation-duration: 20s !important;
+      }
+      .flap-container {
+        transition: transform 0.2s ease !important;
+      }
+      .card {
+        transition: transform 0.2s ease, opacity 0.2s ease !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 背景微光 -->
+  <div class="bg-glow bg-glow--1" aria-hidden="true"></div>
+  <div class="bg-glow bg-glow--2" aria-hidden="true"></div>
+
+  <!-- 微粒子层 -->
+  <div class="particle-layer" id="particleLayer" aria-hidden="true"></div>
+
+  <!-- 贺卡 - 独立固定在屏幕中央 -->
+  <div class="card" id="card">
+    <div class="card-title">🎂 生日快乐 🎂</div>
+    <div class="card-divider"></div>
+    <div class="typewriter-text" id="typewriter"></div>
+    <div class="card-footer"></div>
+  </div>
+
+  <!-- 主场景 -->
+  <main class="scene">
+    <div class="hint" id="hint">轻点火漆 · 开启信封</div>
+
+    <div class="envelope-wrapper" id="envelope" role="button" aria-label="点击火漆打开生日信封" tabindex="0">
+      <div class="envelope-body"></div>
+      <div class="notch"></div>
+      <div class="flap-container">
+        <div class="flap"></div>
+        <div class="flap-inner"></div>
+      </div>
+      <div class="seal" id="seal" aria-label="火漆印章，点击打开"></div>
+    </div>
+  </main>
+  <audio src="" autoplay>
+
+  </audio>
+
+  <script>
+    (() => {
+      // ============ 生日祝福全文 ============
+      const rawMessage =
+        `zhuzhu2012：
+
+h1h1h1h1h1h1h1h1<span class="highlight">point</span>。dd
+
+p p p p p p p p<span class="highlight">emoji</span>，
+p p p p p p p p<span class="highlight">emoji</span>。
+happy birthday
+
+感谢你出现在我的生命里，
+让平凡的日子变得<span class="highlight">操蛋</span>。
+生日快乐，不止今日，
+愿你一生<span class="highlight">穷困潦倒</span>。`;
+
+      // ============ DOM元素 ============
+      const envelope = document.getElementById('envelope');
+      const seal = document.getElementById('seal');
+      const card = document.getElementById('card');
+      const typeEl = document.getElementById('typewriter');
+      const hint = document.getElementById('hint');
+      const particleLayer = document.getElementById('particleLayer');
+
+      let isOpened = false;
+      let isAnimating = false;
+      let typingTimer = null;
+      let typingIndex = 0;
+      let charSequence = [];
+
+      // ============ 解析消息为字符序列 ============
+      function parseMessage(html) {
+        const seq = [];
+        const div = document.createElement('div');
+        div.innerHTML = html;
+
+        function walk(node, isHighlight) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            for (const ch of node.textContent) {
+              seq.push({ char: ch, highlight: isHighlight });
+            }
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const next = isHighlight || node.classList.contains('highlight');
+            for (const child of node.childNodes) {
+              walk(child, next);
+            }
+          }
+        }
+        walk(div, false);
+        return seq;
+      }
+      charSequence = parseMessage(rawMessage);
+
+      // ============ 打字机 ============
+      function stopTyping() {
+        if (typingTimer) {
+          clearInterval(typingTimer);
+          typingTimer = null;
+        }
+      }
+
+      function startTyping() {
+        stopTyping();
+        typingIndex = 0;
+        typeEl.innerHTML = '';
+
+        typingTimer = setInterval(() => {
+          if (typingIndex >= charSequence.length) {
+            stopTyping();
+            return;
+          }
+          const batch = charSequence.slice(0, typingIndex + 1);
+          let html = '';
+          let inH = false;
+          for (const item of batch) {
+            if (item.highlight && !inH) {
+              html += '<span class="highlight">';
+              inH = true;
+            } else if (!item.highlight && inH) {
+              html += '</span>';
+              inH = false;
+            }
+            html += item.char;
+          }
+          if (inH) html += '</span>';
+          typeEl.innerHTML = html;
+
+          // 自动滚动到底部
+          if (card.scrollTop < card.scrollHeight - card.clientHeight - 40) {
+            card.scrollTop = card.scrollHeight;
+          }
+
+          typingIndex++;
+        }, 100);
+      }
+
+      function resetCardText() {
+        stopTyping();
+        typeEl.innerHTML = '';
+        typingIndex = 0;
+        card.scrollTop = 0;
+      }
+
+      // ============ 纸屑特效 ============
+      function spawnConfetti(x, y) {
+        const container = document.createElement('div');
+        container.className = 'confetti-burst';
+        container.style.left = x + 'px';
+        container.style.top = y + 'px';
+        document.body.appendChild(container);
+
+        const colors = [
+          '#f4737b', '#f9a0a6', '#ffd6d9', '#ffffff',
+          '#ffb3b8', '#fce4e6', '#f8c8cc', '#ffe0e3',
+          '#f4848e', '#fff0f2', '#e8e8e8', '#fddde1'
+        ];
+        const pieceCount = 40;
+
+        for (let i = 0; i < pieceCount; i++) {
+          const piece = document.createElement('div');
+          piece.className = 'confetti-piece';
+          piece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+          piece.style.width = (Math.random() * 6 + 4) + 'px';
+          piece.style.height = (Math.random() * 6 + 4) + 'px';
+          piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+
+          const angle = Math.random() * Math.PI * 2;
+          const dist = 55 + Math.random() * 90;
+          const dx = Math.cos(angle) * dist;
+          const dy = Math.sin(angle) * dist - 45;
+
+          piece.style.setProperty('--x15', (dx * 0.15) + 'px');
+          piece.style.setProperty('--y15', (dy * 0.15) + 'px');
+          piece.style.setProperty('--r15', (Math.random() * 180) + 'deg');
+          piece.style.setProperty('--x60', (dx * 0.6) + 'px');
+          piece.style.setProperty('--y60', (dy * 0.6 + 20) + 'px');
+          piece.style.setProperty('--r60', (Math.random() * 300) + 'deg');
+          piece.style.setProperty('--x100', dx + 'px');
+          piece.style.setProperty('--y100', (dy + 70) + 'px');
+          piece.style.setProperty('--r100', (Math.random() * 400) + 'deg');
+
+          container.appendChild(piece);
+        }
+
+        setTimeout(() => {
+          if (container.parentNode) container.remove();
+        }, 1150);
+      }
+
+      // ============ 获取火漆中心坐标 ============
+      function getSealCenter() {
+        const rect = seal.getBoundingClientRect();
+        return {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2
+        };
+      }
+
+      // ============ 打开信封 ============
+      function openEnvelope(clickX, clickY) {
+        if (isAnimating || isOpened) return;
+        isAnimating = true;
+        isOpened = true;
+        hint.classList.add('hidden');
+
+        // 封盖翻转
+        envelope.classList.add('opened');
+
+        // 短暂延迟后显示贺卡
+        setTimeout(() => {
+          card.classList.add('visible');
+          // 第一波纸屑
+          const sealPos = getSealCenter();
+          spawnConfetti(clickX || sealPos.x, clickY || sealPos.y);
+        }, 100);
+
+        // 贺卡动画完成后开始打字
+        setTimeout(() => {
+          startTyping();
+          const cardRect = card.getBoundingClientRect();
+          spawnConfetti(cardRect.left + cardRect.width / 2, cardRect.top + cardRect.height / 2);
+          isAnimating = false;
+        }, 680);
+      }
+
+      // ============ 关闭信封 ============
+      function closeEnvelope() {
+        if (isAnimating || !isOpened) return;
+        isAnimating = true;
+        isOpened = false;
+        resetCardText();
+
+        // 隐藏贺卡
+        card.classList.remove('visible');
+        // 合上封盖
+        envelope.classList.remove('opened');
+        // 恢复提示
+        hint.classList.remove('hidden');
+
+        setTimeout(() => {
+          isAnimating = false;
+        }, 550);
+      }
+
+      // ============ 事件绑定 ============
+      seal.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!isOpened && !isAnimating) {
+          const pos = getSealCenter();
+          openEnvelope(pos.x, pos.y);
+        }
+      });
+      seal.addEventListener('touchend', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (!isOpened && !isAnimating) {
+          const pos = getSealCenter();
+          openEnvelope(pos.x, pos.y);
+        }
+      });
+
+      envelope.addEventListener('click', (e) => {
+        if (isAnimating) return;
+        if (!isOpened && (e.target === seal || seal.contains(e.target))) return;
+        if (isOpened) {
+          closeEnvelope();
+        } else {
+          const pos = getSealCenter();
+          openEnvelope(pos.x, pos.y);
+        }
+      });
+      envelope.addEventListener('touchend', (e) => {
+        if (isAnimating) return;
+        if (!isOpened && (e.target === seal || seal.contains(e.target))) return;
+        if (isOpened) {
+          closeEnvelope();
+        } else {
+          const pos = getSealCenter();
+          openEnvelope(pos.x, pos.y);
+        }
+      });
+
+      // 键盘可访问性
+      envelope.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          if (isAnimating) return;
+          if (isOpened) {
+            closeEnvelope();
+          } else {
+            const pos = getSealCenter();
+            openEnvelope(pos.x, pos.y);
+          }
+        }
+      });
+
+      // 点击贺卡外部关闭（可选）
+      document.addEventListener('click', (e) => {
+        if (isOpened && !isAnimating) {
+          const clickedOnCard = card.contains(e.target);
+          const clickedOnEnvelope = envelope.contains(e.target);
+          if (!clickedOnCard && !clickedOnEnvelope) {
+            closeEnvelope();
+          }
+        }
+      });
+
+      // ============ 背景微粒 ============
+      function createParticle() {
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        particle.style.left = Math.random() * 94 + '%';
+        particle.style.top = (90 + Math.random() * 10) + '%';
+        particle.style.animationDuration = (Math.random() * 12 + 12) + 's';
+        particle.style.animationDelay = Math.random() * 8 + 's';
+        particle.style.width = (Math.random() * 2.5 + 1.5) + 'px';
+        particle.style.height = particle.style.width;
+        particleLayer.appendChild(particle);
+
+        const duration = parseFloat(particle.style.animationDuration) + parseFloat(particle.style
+          .animationDelay);
+        setTimeout(() => {
+          if (particle.parentNode) particle.remove();
+        }, duration * 1000 + 500);
+      }
+
+      function seedParticles(count) {
+        for (let i = 0; i < count; i++) {
+          setTimeout(() => createParticle(), i * 250);
+        }
+      }
+      seedParticles(10);
+
+      let particleInterval = setInterval(() => {
+        const count = particleLayer.querySelectorAll('.particle').length;
+        if (count < 20) createParticle();
+      }, 1800);
+
+      // ============ 页面不可见时优化 ============
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          if (particleInterval) {
+            clearInterval(particleInterval);
+            particleInterval = null;
+          }
+        } else {
+          if (!particleInterval) {
+            particleInterval = setInterval(() => {
+              const count = particleLayer.querySelectorAll('.particle').length;
+              if (count < 20) createParticle();
+            }, 1800);
+          }
+        }
+      });
+
+      // ============ 初始化 ============
+      console.log('🎂 液态玻璃生日贺卡已就绪');
+      console.log('   点击火漆印章打开信封');
+    })();
+  </script>
+</body>
+</html>
